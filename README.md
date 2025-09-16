@@ -9,13 +9,28 @@ A CLI tool that allows safe, temporary live-patching of Kubernetes resources wit
 - Dry-run mode for previewing changes
 - Optional: TTL manager as in-cluster controller or background job
 
-## Intended Example Usage (not implemented yet)
+## Usage
 
+kubefuse set <kind/name> <path=value>... [--ttl 10m] [--reason "..."] [--dry-run]
+
+Example: 
+
+```
 kubefuse deploy/web -n prod \\
   set spec.template.spec.containers[0].image=nginx:1.21 \\
   --ttl 10m \\
   --reason "hotfix for prod"
+```
 
-## Usage 
+### Value Mapping 
+
+| CLI Value    | Internal represenation | 
+|--------------|------------------------|
+| true / false | bool                   |
+| 1,2,3,4 ..   | int                    |
+| null         | nil                    |
+
+
+## Build/Run
 * `go run main.go <command> <subcommand>`
 * or `go build -o kubefuse` and then `./kubefuse <command> <subcommand>`
