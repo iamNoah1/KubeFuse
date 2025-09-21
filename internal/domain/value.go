@@ -39,29 +39,6 @@ func NewString(s string) Value {
 	}
 }
 
-func (v Value) AsBool() (bool, bool) {
-	if v.kind != KindBool {
-		return false, false
-	}
-
-	b, ok := v.raw.(bool)
-	return b, ok
-}
-
-func (v Value) AsInt() (int64, bool) {
-	if v.kind != KindInt {
-		return 0, false
-	}
-
-	i, ok := v.raw.(int64)
-	return i, ok
-}
-
-func (v Value) AsString() (string, bool) {
-	if v.kind != KindString {
-		return "", false
-	}
-
-	s, ok := v.raw.(string)
-	return s, ok
+func (v Value) ToInterface() any {
+	return v.raw
 }

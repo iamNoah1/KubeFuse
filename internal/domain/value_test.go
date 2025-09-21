@@ -1,41 +1,42 @@
 package domain
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestValue_BoolConstructorAndAccessor(t *testing.T) {
-	valueToTest := NewBool(true)
+	v := NewBool(true)
 
-	if valueToTest.Kind() != KindBool {
-		t.Errorf("Kind() = %v, want %v", valueToTest.Kind(), KindBool)
+	if v.Kind() != KindBool {
+		t.Errorf("Kind() = %v, want %v", v.Kind(), KindBool)
 	}
 
-	if got, ok := valueToTest.AsBool(); got != true || ok != true {
-		t.Errorf("AsBool() = (%v,%v), want (%v,%v)", got, ok, true, true)
+	raw, ok := v.ToInterface().(bool)
+	if !ok || raw != true {
+		t.Errorf("raw bool = (%v,%v), want (true,true)", raw, ok)
 	}
 }
 
 func TestValue_IntegerConstructorAndAccessor(t *testing.T) {
-	valueToTest := NewInt(3)
+	v := NewInt(3)
 
-	if valueToTest.Kind() != KindInt {
-		t.Errorf("Kind() = %v, want %v", valueToTest.Kind(), KindInt)
+	if v.Kind() != KindInt {
+		t.Errorf("Kind() = %v, want %v", v.Kind(), KindInt)
 	}
 
-	if got, ok := valueToTest.AsInt(); got != 3 || ok != true {
-		t.Errorf("AsInt() = (%v,%v), want (%v,%v)", got, ok, 3, true)
+	raw, ok := v.ToInterface().(int64) // int64 per constructor
+	if !ok || raw != 3 {
+		t.Errorf("raw int64 = (%v,%v), want (3,true)", raw, ok)
 	}
 }
 
 func TestValue_StringConstructorAndAccessor(t *testing.T) {
-	valueToTest := NewString("string")
+	v := NewString("string")
 
-	if valueToTest.Kind() != KindString {
-		t.Errorf("Kind() = %v, want %v", valueToTest.Kind(), KindString)
+	if v.Kind() != KindString {
+		t.Errorf("Kind() = %v, want %v", v.Kind(), KindString)
 	}
 
-	if got, ok := valueToTest.AsString(); got != "string" || ok != true {
-		t.Errorf("AsString() = (%v,%v), want (%v,%v)", got, ok, "string", true)
+	raw, ok := v.ToInterface().(string)
+	if !ok || raw != "string" {
+		t.Errorf("raw string = (%v,%v), want (\"string\",true)", raw, ok)
 	}
 }
