@@ -9,7 +9,7 @@ func TestParser_Bool(t *testing.T) {
 	domainValue, err := ParseLiteral("true")
 
 	if err != nil {
-		t.Errorf("Erorr while parsing")
+		t.Errorf("Error while parsing")
 	}
 
 	if domainValue.Kind() != domain.KindBool {
@@ -19,7 +19,7 @@ func TestParser_Bool(t *testing.T) {
 	domainValue, err = ParseLiteral("false")
 
 	if err != nil {
-		t.Errorf("Erorr while parsing")
+		t.Errorf("Error while parsing")
 	}
 
 	if domainValue.Kind() != domain.KindBool {
@@ -37,7 +37,7 @@ func TestParser_Int(t *testing.T) {
 	domainValue, err := ParseLiteral("2")
 
 	if err != nil {
-		t.Errorf("Erorr while parsing")
+		t.Errorf("Error while parsing")
 	}
 
 	if domainValue.Kind() != domain.KindInt {
