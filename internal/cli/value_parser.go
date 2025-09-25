@@ -10,24 +10,24 @@ import (
 
 var intPattern = regexp.MustCompile(`^-?\d+$`)
 
-func ParseLiteral(s string) (domain.Value, error) {
-	s = strings.TrimSpace(s)
+func ParseLiteral(literal string) (domain.Value, error) {
+	literal = strings.TrimSpace(literal)
 
 	switch {
-	case s == "true":
+	case literal == "true":
 		return domain.NewBool(true), nil
 
-	case s == "false":
+	case literal == "false":
 		return domain.NewBool(false), nil
 
-	case isIntLiteral(s):
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+	case isIntLiteral(literal):
+		if i, err := strconv.ParseInt(literal, 10, 64); err == nil {
 			return domain.NewInt(i), nil
 		}
-		return domain.Value{}, fmt.Errorf("integer out of range: %q", s)
+		return domain.Value{}, fmt.Errorf("integer out of range: %q", literal)
 
 	default:
-		return domain.Value{}, fmt.Errorf("invalid literal: %q", s)
+		return domain.Value{}, fmt.Errorf("invalid literal: %q", literal)
 	}
 }
 

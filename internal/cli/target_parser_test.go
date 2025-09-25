@@ -1,0 +1,65 @@
+package cli
+
+import "testing"
+
+func TestTargetParser_TwoSegementsShouldReturnCorrectObject(t *testing.T) {
+	testString := "deploy/web"
+
+	resource, err := ParseTarget(testString)
+
+	if err != nil {
+		t.Errorf("Error while parsing")
+	}
+
+	if resource.Kind != "deploy" || resource.Name != "web" {
+		t.Errorf("Expected kind: %s, but got: %s and name: %s, but got: %s", "deploy", resource.Kind, "web", resource.Name)
+	}
+}
+
+func TestTargetParser_ThreeSegmentsShouldReturnError(t *testing.T) {
+	testString := "deploy/web/pod"
+
+	_, err := ParseTarget(testString)
+
+	if err != nil {
+		if err.Error() != "More than 2 target segments are not allowed" {
+			t.Errorf("Expected error: %s, got: %s", "More than 2 target segments are not allowed", err.Error())
+		}
+	}
+}
+
+func TestTargetParser_TwoSegmentsFirstEmptyShouldReturnError(t *testing.T) {
+	testString := "/web"
+
+	_, err := ParseTarget(testString)
+
+	if err != nil {
+		if err.Error() != "Empty target segments are not allowed" {
+			t.Errorf("Expected error: %s, got: %s", "Empty target segments are not allowed", err.Error())
+		}
+	}
+}
+
+func TestTargetParser_TwoSegmentsSecondEmptyShouldReturnError(t *testing.T) {
+	testString := "deploy/"
+
+	_, err := ParseTarget(testString)
+
+	if err != nil {
+		if err.Error() != "Empty target segments are not allowed" {
+			t.Errorf("Expected error: %s, got: %s", "Empty target segments are not allowed", err.Error())
+		}
+	}
+}
+
+func TestTargetParser_EmptyStringShouldReturnError(t *testing.T) {
+	testString := ""
+
+	_, err := ParseTarget(testString)
+
+	if err != nil {
+		if err.Error() != "Empty target is not allowed" {
+			t.Errorf("Expected error: %s, got: %s", "Empty target is not allowed", err.Error())
+		}
+	}
+}

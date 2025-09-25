@@ -2,7 +2,7 @@ package cli
 
 import "testing"
 
-func TestParser_ThreeValidSegmentsShouldReturnCorrectSlice(t *testing.T) {
+func TestPathParser_ThreeValidSegmentsShouldReturnCorrectSlice(t *testing.T) {
 	testString := "spec.template.metadata"
 
 	slice, err := ParsePath(testString)
@@ -20,7 +20,7 @@ func TestParser_ThreeValidSegmentsShouldReturnCorrectSlice(t *testing.T) {
 	}
 }
 
-func TestParser_ThreeSegmentsMiddleOneEmptyShouldReturnError(t *testing.T) {
+func TestPathParser_ThreeSegmentsMiddleOneEmptyShouldReturnError(t *testing.T) {
 	testString := "spec..metadata"
 
 	_, err := ParsePath(testString)
@@ -34,7 +34,7 @@ func TestParser_ThreeSegmentsMiddleOneEmptyShouldReturnError(t *testing.T) {
 	}
 }
 
-func TestParser_FirstSegmentEmptyShouldReturnError(t *testing.T) {
+func TestPathParser_FirstSegmentEmptyShouldReturnError(t *testing.T) {
 	testString := ".metadata"
 
 	_, err := ParsePath(testString)
@@ -48,7 +48,7 @@ func TestParser_FirstSegmentEmptyShouldReturnError(t *testing.T) {
 	}
 }
 
-func TestParser_LastSegmentEmptyShouldReturnError(t *testing.T) {
+func TestPathParser_LastSegmentEmptyShouldReturnError(t *testing.T) {
 	testString := "metadata."
 
 	_, err := ParsePath(testString)
@@ -62,7 +62,7 @@ func TestParser_LastSegmentEmptyShouldReturnError(t *testing.T) {
 	}
 }
 
-func TestParser_EmptyStringShouldReturnError(t *testing.T) {
+func TestPathParser_EmptyStringShouldReturnError(t *testing.T) {
 	testString := ""
 
 	_, err := ParsePath(testString)
