@@ -23,6 +23,8 @@ package cmd
 
 import (
 	"fmt"
+	"kubefuse/internal/app"
+	"kubefuse/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -33,12 +35,33 @@ var setCmd = &cobra.Command{
 	Short: "Patch fields on a resource with optional TTL and audit",
 	Args:  cobra.MinimumNArgs(2),
 	Long:  `Patch fields on a resource with optional TTL and audit`,
-	Run: func(cmd *cobra.Command, args []string) {
-		target := args[0]
-		patches := args[1:]
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("Enter set command")
 
-		fmt.Println("target:", target)
-		fmt.Println("patches:", patches)
+		targetRaw := args[0]
+		patches := args[1:]
+		namespace, err := cmd.Flags().GetString("namespace")
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("target: ", targetRaw)
+		fmt.Println("patches: ", patches)
+		fmt.Println("namespace: " + namespace)
+
+		target, err := cli.ParseTarget(targetRaw)
+		if err != nil {
+			return err
+		}
+
+		dto := app.SetDTO{
+			Kind: target[0],
+			Name: target[1],
+		}
+
+		fmt.Println("dto: ", dto)
+
+		return nil
 	},
 }
 
@@ -49,7 +72,9 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// setCmd.PersistentFlags().String("foo", "", "A help for foo")
+	setCmd.Flags().StringP("namespace", "n", "", "K8s namespace")
+	setCmd.Flags().StringP("ttl", "t", "10m", "Time to life before the change gets rolled back")
+	setCmd.Flags().StringP("reason", "r", "test", "Reason for the patch, gets added to k8s resource annotation")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

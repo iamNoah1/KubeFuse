@@ -20,6 +20,7 @@ kubefuse deploy/web -n prod \\
   set spec.template.spec.containers[0].image=nginx:1.21 \\
   --ttl 10m \\
   --reason "hotfix for prod"
+  --namespace kubefuse
 ```
 
 ### Value Mapping 
@@ -34,3 +35,10 @@ kubefuse deploy/web -n prod \\
 ## Build/Run
 * `go run main.go <command> <subcommand>`
 * or `go build -o kubefuse` and then `./kubefuse <command> <subcommand>`
+
+## Run Tests 
+* `go test ./...`
+
+## Additional Resources
+* https://github.com/spf13/cobra
+* 

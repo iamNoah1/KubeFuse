@@ -2,11 +2,10 @@ package cli
 
 import (
 	"errors"
-	"kubefuse/internal/domain"
 	"strings"
 )
 
-func ParseTarget(target string) (*domain.ResourceRef, error) {
+func ParseTarget(target string) ([]string, error) {
 	if target == "" {
 		return nil, errors.New("Empty target is not allowed")
 	}
@@ -21,5 +20,5 @@ func ParseTarget(target string) (*domain.ResourceRef, error) {
 		return nil, errors.New("Empty target segments are not allowed")
 	}
 
-	return domain.NewResourceRef(split[0], split[1]), nil
+	return split, nil
 }

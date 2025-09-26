@@ -5,14 +5,14 @@ import "testing"
 func TestTargetParser_TwoSegementsShouldReturnCorrectObject(t *testing.T) {
 	testString := "deploy/web"
 
-	resource, err := ParseTarget(testString)
+	target, err := ParseTarget(testString)
 
 	if err != nil {
 		t.Errorf("Error while parsing")
 	}
 
-	if resource.Kind != "deploy" || resource.Name != "web" {
-		t.Errorf("Expected kind: %s, but got: %s and name: %s, but got: %s", "deploy", resource.Kind, "web", resource.Name)
+	if target[0] != "deploy" || target[1] != "web" {
+		t.Errorf("Expected kind: %s, but got: %s and name: %s, but got: %s", "deploy", target[0], "web", target[1])
 	}
 }
 
