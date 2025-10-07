@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 	"kubefuse/internal/app"
-	"kubefuse/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -39,24 +38,16 @@ var setCmd = &cobra.Command{
 		fmt.Println("Enter set command")
 
 		targetRaw := args[0]
-		patches := args[1:]
+		patchesRaw := args[1:]
 		namespace, err := cmd.Flags().GetString("namespace")
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("target: ", targetRaw)
-		fmt.Println("patches: ", patches)
-		fmt.Println("namespace: " + namespace)
-
-		target, err := cli.ParseTarget(targetRaw)
-		if err != nil {
-			return err
-		}
-
 		dto := app.SetDTO{
-			Kind: target[0],
-			Name: target[1],
+			TargetRaw:     targetRaw,
+			PathesRaw:     patchesRaw,
+			NamespaceFlag: namespace,
 		}
 
 		fmt.Println("dto: ", dto)
