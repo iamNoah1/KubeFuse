@@ -16,7 +16,7 @@ func ParseTarget(target string) ([]string, error) {
 		return nil, errors.New("More than 2 target segments are not allowed")
 	}
 
-	if split[0] == "" || split[1] == "" {
+	if split[0] == " || split[1] == " {
 		return nil, errors.New("Empty target segments are not allowed")
 	}
 
