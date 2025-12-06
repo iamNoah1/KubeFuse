@@ -5,9 +5,9 @@ type Patch struct {
 	Value Value
 }
 
-func NewAssigment(path []string, value Value) Patch {
+func NewPatch(path []string, value Value) Patch {
 	return Patch{
-		path,
-		value,
+		Path:  path,
+		Value: value,
 	}
 }

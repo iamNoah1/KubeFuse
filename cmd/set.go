@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"kubefuse/internal/app"
 
 	"github.com/spf13/cobra"
@@ -35,8 +34,6 @@ var setCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	Long:  `Patch fields on a resource with optional TTL and audit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Enter set command")
-
 		targetRaw := args[0]
 		patchesRaw := args[1:]
 		namespace, err := cmd.Flags().GetString("namespace")
@@ -44,15 +41,25 @@ var setCmd = &cobra.Command{
 			return err
 		}
 
-		dto := app.SetDTO{
-			TargetRaw:     targetRaw,
-			PathesRaw:     patchesRaw,
-			NamespaceFlag: namespace,
+		reason, err := cmd.Flags().GetString("reason")
+		if err != nil {
+			return err
 		}
 
-		fmt.Println("dto: ", dto)
+		ttl, err := cmd.Flags().GetString("ttl")
+		if err != nil {
+			return err
+		}
 
-		return nil
+		dto := app.SetDTO{
+			TargetRaw:     targetRaw,
+			PatchesRaw:    patchesRaw,
+			NamespaceFlag: namespace,
+			Reason:        reason,
+			TTL:           ttl,
+		}
+
+		return app.SetHandler(dto)
 	},
 }
 

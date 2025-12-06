@@ -17,7 +17,7 @@ Example:
 
 ```
 kubefuse deploy/web -n prod \\
-  set spec.template.spec.containers[0].image=nginx:1.21 \\
+  set spec.template.spec.containers[0].image=nginx:1.21 spec.template.spec.containers[1].image=nginx:1.19\\
   --ttl 10m \\
   --reason "hotfix for prod"
   --namespace kubefuse
