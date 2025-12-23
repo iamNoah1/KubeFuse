@@ -118,6 +118,22 @@ func TestParseLiteral_DecimalAsString(t *testing.T) {
 	}
 }
 
+func TestParseLiteral_Null(t *testing.T) {
+	domainValue, err := ParseLiteral("null")
+
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
+	}
+
+	if domainValue.Kind() != domain.KindNull {
+		t.Fatalf("Expected KindNull, got: %v", domainValue.Kind())
+	}
+
+	if domainValue.ToInterface() != nil {
+		t.Fatalf("Expected nil value, got: %v", domainValue.ToInterface())
+	}
+}
+
 func TestParseLiteral_TypoInBool(t *testing.T) {
 	// "ture" is a typo, should be treated as a string
 	domainValue, err := ParseLiteral("ture")
