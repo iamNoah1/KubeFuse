@@ -40,3 +40,15 @@ func TestValue_StringConstructorAndAccessor(t *testing.T) {
 		t.Errorf("raw string = (%v,%v), want (\"string\",true)", raw, ok)
 	}
 }
+
+func TestValue_NullConstructorAndAccessor(t *testing.T) {
+	v := NewNull()
+
+	if v.Kind() != KindNull {
+		t.Errorf("Kind() = %v, want %v", v.Kind(), KindNull)
+	}
+
+	if raw := v.ToInterface(); raw != nil {
+		t.Errorf("raw nil = %v, want nil", raw)
+	}
+}

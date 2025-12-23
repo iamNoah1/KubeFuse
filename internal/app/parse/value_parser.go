@@ -25,8 +25,7 @@ func ParseLiteral(literal string) (domain.Value, error) {
 		return domain.NewBool(false), nil
 
 	case literal == "null":
-		// TODO: Add support for null/nil values if needed
-		return domain.Value{}, fmt.Errorf("null values not yet supported")
+		return domain.NewNull(), nil
 
 	case isIntLiteral(literal):
 		if i, err := strconv.ParseInt(literal, 10, 64); err == nil {

@@ -25,6 +25,13 @@ func NewBool(b bool) Value {
 	}
 }
 
+func NewNull() Value {
+	return Value{
+		KindNull,
+		nil,
+	}
+}
+
 func NewInt(i int64) Value {
 	return Value{
 		KindInt,
