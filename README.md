@@ -36,6 +36,35 @@ kubefuse deploy/web -n prod \\
 * `go run main.go <command> <subcommand>`
 * or `go build -o kubefuse` and then `./kubefuse <command> <subcommand>`
 
+## Download a Release
+Prebuilt binaries are published on GitHub Releases.
+
+1) Open the latest release: `https://github.com/<owner>/<repo>/releases/latest`
+2) Download the asset for your OS/arch (e.g., `kubefuse_v0.1.0_darwin_arm64.tar.gz`).
+
+Example (macOS arm64):
+
+```sh
+curl -LO https://github.com/<owner>/<repo>/releases/download/v0.1.0/kubefuse_v0.1.0_darwin_arm64.tar.gz
+tar -xzf kubefuse_v0.1.0_darwin_arm64.tar.gz
+./kubefuse --help
+```
+
+## Install
+Choose one of the standard install options below.
+
+### Go install (recommended for Go users)
+```sh
+go install github.com/iamNoah1/KubeFuse@latest
+```
+
+### Release binary (no Go toolchain required)
+```sh
+curl -LO https://github.com/iamNoah1/KubeFuse/releases/download/v0.1.0/kubefuse_v0.1.0_darwin_arm64.tar.gz
+tar -xzf kubefuse_v0.1.0_darwin_arm64.tar.gz
+./kubefuse --help
+```
+
 ## Run Tests 
 * `go test ./...`
 
