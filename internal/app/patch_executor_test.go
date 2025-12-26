@@ -60,9 +60,10 @@ func TestBuildMergePatchPayloadAddsAnnotations(t *testing.T) {
 func TestExecutePatchIntentAppliesPatch(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
 	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	gvrSingular := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"}
 
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
-	mapper.AddSpecific(gvk, gvr, gvr, meta.RESTScopeNamespace)
+	mapper.AddSpecific(gvk, gvr, gvrSingular, meta.RESTScopeNamespace)
 
 	deployment := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -112,5 +113,81 @@ func TestExecutePatchIntentAppliesPatch(t *testing.T) {
 
 	if !found || reason != "scale up" {
 		t.Fatalf("expected reason annotation to be set, got %q (found=%t)", reason, found)
+	}
+}
+
+func TestExecutePatchIntentRollsBackAfterTTL(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	gvrSingular := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"}
+
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
+	mapper.AddSpecific(gvk, gvr, gvrSingular, meta.RESTScopeNamespace)
+
+	deployment := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]any{
+				"name":      "web",
+				"namespace": "default",
+				"annotations": map[string]any{
+					annotationReason: "previous",
+					annotationTTL:    "30s",
+				},
+			},
+			"spec": map[string]any{
+				"replicas": int64(1),
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	client := fake.NewSimpleDynamicClient(scheme, deployment)
+	executor := NewPatchExecutorWithClients(client, mapper)
+	executor.waitFunc = func(ctx context.Context, d time.Duration) error {
+		return nil
+	}
+
+	intent := domain.NewPatchIntent(domain.ResourceRef{Kind: "deployments", Name: "web", Namespace: "default"},
+		[]domain.Patch{domain.NewPatch([]string{"spec", "replicas"}, domain.NewInt(4))},
+		domain.WithReason("scale up"),
+		domain.WithTTL(5*time.Second),
+	)
+
+	if err := executor.ExecutePatchIntent(context.Background(), intent); err != nil {
+		t.Fatalf("ExecutePatchIntent returned error: %v", err)
+	}
+
+	updated, err := client.Resource(gvr).Namespace("default").Get(context.Background(), "web", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to fetch patched resource: %v", err)
+	}
+
+	replicas, found, err := unstructured.NestedInt64(updated.Object, "spec", "replicas")
+	if err != nil {
+		t.Fatalf("error reading replicas: %v", err)
+	}
+
+	if !found || replicas != 1 {
+		t.Fatalf("expected replicas to be rolled back to 1, got %d (found=%t)", replicas, found)
+	}
+
+	reason, found, err := unstructured.NestedString(updated.Object, "metadata", "annotations", annotationReason)
+	if err != nil {
+		t.Fatalf("error reading reason annotation: %v", err)
+	}
+
+	if !found || reason != "previous" {
+		t.Fatalf("expected reason annotation to be restored, got %q (found=%t)", reason, found)
+	}
+
+	ttl, found, err := unstructured.NestedString(updated.Object, "metadata", "annotations", annotationTTL)
+	if err != nil {
+		t.Fatalf("error reading ttl annotation: %v", err)
+	}
+
+	if !found || ttl != "30s" {
+		t.Fatalf("expected ttl annotation to be restored, got %q (found=%t)", ttl, found)
 	}
 }

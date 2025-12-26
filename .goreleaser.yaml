@@ -1,0 +1,35 @@
+version: 2
+
+project_name: kubefuse
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kubefuse
+    main: ./main.go
+    binary: kubefuse
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github

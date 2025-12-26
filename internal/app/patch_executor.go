@@ -8,9 +8,12 @@ import (
 	"kubefuse/internal/domain"
 	"os"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -30,6 +33,7 @@ const (
 type PatchExecutor struct {
 	dynamicClient dynamic.Interface
 	restMapper    meta.RESTMapper
+	waitFunc      func(context.Context, time.Duration) error
 }
 
 func NewPatchExecutor() (*PatchExecutor, error) {
@@ -46,6 +50,7 @@ func NewPatchExecutor() (*PatchExecutor, error) {
 	mapper := restmapper.NewShortcutExpander(
 		restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(disco)),
 		disco,
+		nil,
 	)
 
 	dynClient, err := dynamic.NewForConfig(cfg)
@@ -53,11 +58,11 @@ func NewPatchExecutor() (*PatchExecutor, error) {
 		return nil, fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	return &PatchExecutor{dynamicClient: dynClient, restMapper: mapper}, nil
+	return &PatchExecutor{dynamicClient: dynClient, restMapper: mapper, waitFunc: waitForTTL}, nil
 }
 
 func NewPatchExecutorWithClients(dynamicClient dynamic.Interface, mapper meta.RESTMapper) *PatchExecutor {
-	return &PatchExecutor{dynamicClient: dynamicClient, restMapper: mapper}
+	return &PatchExecutor{dynamicClient: dynamicClient, restMapper: mapper, waitFunc: waitForTTL}
 }
 
 func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.PatchIntent) error {
@@ -89,6 +94,19 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 		return err
 	}
 
+	var rollbackPayload map[string]any
+	if intent.TTL > 0 && !intent.DryRun {
+		current, err := resourceClient.Get(ctx, intent.Resource.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to read resource for rollback: %w", err)
+		}
+
+		rollbackPayload, err = buildRollbackPayload(current, intent)
+		if err != nil {
+			return err
+		}
+	}
+
 	options := metav1.PatchOptions{FieldManager: fieldManager}
 	if intent.DryRun {
 		options.DryRun = []string{metav1.DryRunAll}
@@ -97,6 +115,28 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 	_, err = resourceClient.Patch(ctx, intent.Resource.Name, types.MergePatchType, patchBytes, options)
 	if err != nil {
 		return fmt.Errorf("failed to apply patch: %w", err)
+	}
+
+	if intent.DryRun || intent.TTL <= 0 {
+		return nil
+	}
+
+	if p.waitFunc == nil {
+		return errors.New("no wait function configured for TTL rollback")
+	}
+
+	if err := p.waitFunc(ctx, intent.TTL); err != nil {
+		return err
+	}
+
+	rollbackBytes, err := json.Marshal(rollbackPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal rollback payload: %w", err)
+	}
+
+	_, err = resourceClient.Patch(ctx, intent.Resource.Name, types.MergePatchType, rollbackBytes, options)
+	if err != nil {
+		return fmt.Errorf("failed to rollback patch: %w", err)
 	}
 
 	return nil
@@ -182,6 +222,98 @@ func buildMergePatchPayload(intent domain.PatchIntent) (map[string]any, error) {
 	return root, nil
 }
 
+type pathValue struct {
+	path  []string
+	value any
+	found bool
+}
+
+func buildRollbackPayload(resource *unstructured.Unstructured, intent domain.PatchIntent) (map[string]any, error) {
+	values := make([]pathValue, 0, len(intent.Patches)+2)
+
+	for _, patch := range intent.Patches {
+		value, found, err := unstructured.NestedFieldNoCopy(resource.Object, patch.Path...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read original value for %s: %w", strings.Join(patch.Path, "."), err)
+		}
+		if found {
+			value = runtime.DeepCopyJSONValue(value)
+		}
+
+		values = append(values, pathValue{path: patch.Path, value: value, found: found})
+	}
+
+	if intent.Reason != "" {
+		value, err := readAnnotationValue(resource, annotationReason)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+
+	if intent.TTL != 0 {
+		value, err := readAnnotationValue(resource, annotationTTL)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+
+	return buildMergePatchPayloadFromValues(values)
+}
+
+func readAnnotationValue(resource *unstructured.Unstructured, key string) (pathValue, error) {
+	path := []string{"metadata", "annotations", key}
+	value, found, err := unstructured.NestedFieldNoCopy(resource.Object, path...)
+	if err != nil {
+		return pathValue{}, fmt.Errorf("failed to read original annotation %q: %w", key, err)
+	}
+	if found {
+		value = runtime.DeepCopyJSONValue(value)
+	}
+	return pathValue{path: path, value: value, found: found}, nil
+}
+
+func buildMergePatchPayloadFromValues(values []pathValue) (map[string]any, error) {
+	root := map[string]any{}
+
+	for _, item := range values {
+		if len(item.path) == 0 {
+			return nil, errors.New("patch path cannot be empty")
+		}
+
+		current := root
+
+		for i, segment := range item.path {
+			if i == len(item.path)-1 {
+				if item.found {
+					current[segment] = item.value
+				} else {
+					current[segment] = nil
+				}
+				continue
+			}
+
+			next, ok := current[segment]
+			if !ok {
+				nested := map[string]any{}
+				current[segment] = nested
+				current = nested
+				continue
+			}
+
+			nested, ok := next.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("conflicting patch path at %s", strings.Join(item.path[:i+1], "."))
+			}
+
+			current = nested
+		}
+	}
+
+	return root, nil
+}
+
 func ensureNestedMap(parent map[string]any, key string) map[string]any {
 	if val, ok := parent[key]; ok {
 		if nested, ok := val.(map[string]any); ok {
@@ -192,6 +324,22 @@ func ensureNestedMap(parent map[string]any, key string) map[string]any {
 	nested := map[string]any{}
 	parent[key] = nested
 	return nested
+}
+
+func waitForTTL(ctx context.Context, ttl time.Duration) error {
+	if ttl <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(ttl)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func buildKubeConfig() (*rest.Config, error) {

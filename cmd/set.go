@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"kubefuse/internal/app"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,47 @@ var setCmd = &cobra.Command{
 	Short: "Patch fields on a resource with optional TTL and audit",
 	Args:  cobra.MinimumNArgs(2),
 	Long:  `Patch fields on a resource with optional TTL and audit`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		namespace, _ := cmd.Flags().GetString("namespace")
+
+		if strings.Contains(toComplete, "/") {
+			parts := strings.SplitN(toComplete, "/", 2)
+			kind := parts[0]
+			namePrefix := parts[1]
+
+			names, err := app.ListResourceNames(cmd.Context(), kind, namespace)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			completions := make([]string, 0, len(names))
+			for _, name := range names {
+				if namePrefix != "" && !strings.HasPrefix(name, namePrefix) {
+					continue
+				}
+				completions = append(completions, kind+"/"+name)
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		kinds, err := app.ListResourceKinds()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		completions := make([]string, 0, len(kinds))
+		for _, kind := range kinds {
+			if toComplete != "" && !strings.HasPrefix(kind, toComplete) {
+				continue
+			}
+			completions = append(completions, kind+"/")
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		targetRaw := args[0]
 		patchesRaw := args[1:]

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `cmd/`: Cobra CLI entrypoints and subcommands (`root.go`, `set.go`).
+- `cmd/`: Cobra CLI entrypoints and subcommands.
 - `internal/app/`: Application logic and DTOs; parsing lives in `internal/app/parse/`.
 - `internal/domain/`: Domain types like patch intents, values, and resource refs.
 - `main.go`: CLI bootstrap and wiring.
@@ -21,6 +21,7 @@
 - `go test ./...`: Run the full test suite.
 - `go test -tags=integration ./internal/integration`: Run envtest-based integration tests (requires `KUBEBUILDER_ASSETS`).
 - `scripts/kind-up.sh` and `scripts/kind-down.sh`: Start/stop a local kind cluster for end-to-end testing.
+ - Releases are created by tagging (e.g., `v0.1.0`) and pushing the tag.
 
 ## Coding Style & Naming Conventions
 - Go standard formatting; run `gofmt` on all `.go` files.
