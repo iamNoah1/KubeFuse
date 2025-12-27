@@ -2,7 +2,7 @@ package parse
 
 import (
 	"errors"
-	"kubefuse/internal/domain"
+	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"strings"
 )
 

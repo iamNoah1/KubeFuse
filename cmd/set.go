@@ -22,7 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"kubefuse/internal/app"
+	"github.com/iamNoah1/KubeFuse/internal/app"
 	"strings"
 
 	"github.com/spf13/cobra"

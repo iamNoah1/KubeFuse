@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 package main
 
-import "kubefuse/cmd"
+import "github.com/iamNoah1/KubeFuse/cmd"
 
 func main() {
 	cmd.Execute()

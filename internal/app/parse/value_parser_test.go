@@ -1,7 +1,7 @@
 package parse
 
 import (
-	"kubefuse/internal/domain"
+	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"testing"
 )
 

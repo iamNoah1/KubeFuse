@@ -2,7 +2,7 @@ package parse
 
 import (
 	"fmt"
-	"kubefuse/internal/domain"
+	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"regexp"
 	"strconv"
 	"strings"

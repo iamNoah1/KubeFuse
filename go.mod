@@ -1,4 +1,4 @@
-module kubefuse
+module github.com/iamNoah1/KubeFuse
 
 go 1.24.3
 

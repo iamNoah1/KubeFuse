@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
-	"kubefuse/internal/app/parse"
-	"kubefuse/internal/domain"
+	"github.com/iamNoah1/KubeFuse/internal/app/parse"
+	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"time"
 )
 

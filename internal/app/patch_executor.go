@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"kubefuse/internal/domain"
+	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"os"
 	"strings"
 	"time"
