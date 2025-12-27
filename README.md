@@ -57,6 +57,46 @@ Example (namespace + labels):
 kubefuse set deploy/api -n prod metadata.labels.tier=backend --ttl 30m --reason "temporary label"
 ```
 
+Example (dry-run preview):
+
+```sh
+kubefuse set deployment/web spec.replicas=3 -n default --ttl 5m --reason "scale for peak" --dry-run
+```
+
+Example output (values depend on the current resource):
+
+```text
+Dry run enabled. No changes applied.
+Target: deployment/web
+Namespace: default
+Reason: scale for peak
+TTL: 5m0s
+Apply patch:
+{
+  "metadata": {
+    "annotations": {
+      "kubefuse.dev/reason": "scale for peak",
+      "kubefuse.dev/ttl": "5m0s"
+    }
+  },
+  "spec": {
+    "replicas": 3
+  }
+}
+Rollback patch:
+{
+  "metadata": {
+    "annotations": {
+      "kubefuse.dev/reason": null,
+      "kubefuse.dev/ttl": null
+    }
+  },
+  "spec": {
+    "replicas": 1
+  }
+}
+```
+
 ## How It Works
 
 1. KubeFuse reads the current values at each patch path (and the existing audit annotations).

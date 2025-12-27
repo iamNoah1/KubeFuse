@@ -23,6 +23,36 @@ go build -o kubefuse
 go test ./...
 ```
 
+### Integration tests (envtest)
+
+The integration tests run against controller-runtime's envtest binaries (local API server + etcd)
+instead of a real cluster. This is faster than kind and good for API-level behavior that doesn't
+need real nodes, CRI, or controllers.
+
+Use kind when you want a full Kubernetes control plane and nodes for end-to-end testing.
+
+More info:
+- https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/envtest
+- https://book.kubebuilder.io/reference/envtest.html
+
+Use the helper script to print the `KUBEBUILDER_ASSETS` export line:
+
+```sh
+./scripts/setup-envtest.sh
+export KUBEBUILDER_ASSETS=... # copy from script output
+go test -tags=integration ./internal/integration
+```
+
+### End-to-end tests (kind)
+
+End-to-end tests should run against a real cluster (kind) and verify KubeFuse behavior
+across create → patch → TTL rollback. These are heavier and can be reserved for release
+validation.
+
+```sh
+./scripts/e2e-kind.sh
+```
+
 ## Local Cluster (quick start)
 
 ### kind (Kubernetes-in-Docker)
@@ -35,8 +65,14 @@ go install sigs.k8s.io/kind@latest
 Create a cluster:
 
 ```sh
-kind create cluster --name kubefuse
+./scripts/kind-up.sh
 kubectl config use-context kind-kubefuse
+```
+
+Delete the cluster:
+
+```sh
+./scripts/kind-down.sh
 ```
 
 ### Docker Desktop Kubernetes
