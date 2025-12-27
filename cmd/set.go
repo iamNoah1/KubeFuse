@@ -121,7 +121,7 @@ func init() {
 	setCmd.Flags().StringP("namespace", "n", "", "K8s namespace")
 	setCmd.Flags().StringP("ttl", "t", "10m", "Time to life before the change gets rolled back")
 	setCmd.Flags().StringP("reason", "r", "test", "Reason for the patch, gets added to k8s resource annotation")
-	setCmd.Flags().Bool("dry-run", false, "Preview the patch without applying it")
+	setCmd.Flags().Bool("dry-run", false, "Preview apply/rollback patches without applying changes")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

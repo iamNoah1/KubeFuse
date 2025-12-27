@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/iamNoah1/KubeFuse/internal/domain"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ type PatchExecutor struct {
 	dynamicClient dynamic.Interface
 	restMapper    meta.RESTMapper
 	waitFunc      func(context.Context, time.Duration) error
+	output        io.Writer
 }
 
 func NewPatchExecutor() (*PatchExecutor, error) {
@@ -58,11 +60,11 @@ func NewPatchExecutor() (*PatchExecutor, error) {
 		return nil, fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	return &PatchExecutor{dynamicClient: dynClient, restMapper: mapper, waitFunc: waitForTTL}, nil
+	return &PatchExecutor{dynamicClient: dynClient, restMapper: mapper, waitFunc: waitForTTL, output: os.Stdout}, nil
 }
 
 func NewPatchExecutorWithClients(dynamicClient dynamic.Interface, mapper meta.RESTMapper) *PatchExecutor {
-	return &PatchExecutor{dynamicClient: dynamicClient, restMapper: mapper, waitFunc: waitForTTL}
+	return &PatchExecutor{dynamicClient: dynamicClient, restMapper: mapper, waitFunc: waitForTTL, output: os.Stdout}
 }
 
 func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.PatchIntent) error {
@@ -94,23 +96,35 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 		return err
 	}
 
-	var rollbackPayload map[string]any
-	if intent.TTL > 0 && !intent.DryRun {
-		current, err := resourceClient.Get(ctx, intent.Resource.Name, metav1.GetOptions{})
+	var current *unstructured.Unstructured
+	if intent.DryRun {
+		var err error
+		current, err = resourceClient.Get(ctx, intent.Resource.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to read resource for preview: %w", err)
+		}
+	} else if intent.TTL > 0 {
+		var err error
+		current, err = resourceClient.Get(ctx, intent.Resource.Name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to read resource for rollback: %w", err)
 		}
+	}
 
+	var rollbackPayload map[string]any
+	if intent.TTL > 0 {
+		var err error
 		rollbackPayload, err = buildRollbackPayload(current, intent)
 		if err != nil {
 			return err
 		}
 	}
 
-	options := metav1.PatchOptions{FieldManager: fieldManager}
 	if intent.DryRun {
-		options.DryRun = []string{metav1.DryRunAll}
+		return p.printDryRunPreview(intent, payload, rollbackPayload)
 	}
+
+	options := metav1.PatchOptions{FieldManager: fieldManager}
 
 	_, err = resourceClient.Patch(ctx, intent.Resource.Name, types.MergePatchType, patchBytes, options)
 	if err != nil {
@@ -139,6 +153,45 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 		return fmt.Errorf("failed to rollback patch: %w", err)
 	}
 
+	return nil
+}
+
+func (p *PatchExecutor) printDryRunPreview(intent domain.PatchIntent, applyPayload map[string]any, rollbackPayload map[string]any) error {
+	writer := p.output
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	fmt.Fprintln(writer, "Dry run enabled. No changes applied.")
+	fmt.Fprintf(writer, "Target: %s/%s\n", intent.Resource.Kind, intent.Resource.Name)
+	if intent.Resource.Namespace != "" {
+		fmt.Fprintf(writer, "Namespace: %s\n", intent.Resource.Namespace)
+	}
+	if intent.Reason != "" {
+		fmt.Fprintf(writer, "Reason: %s\n", intent.Reason)
+	}
+	if intent.TTL > 0 {
+		fmt.Fprintf(writer, "TTL: %s\n", intent.TTL)
+	}
+
+	applyBytes, err := json.MarshalIndent(applyPayload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format apply patch: %w", err)
+	}
+	fmt.Fprintln(writer, "Apply patch:")
+	fmt.Fprintln(writer, string(applyBytes))
+
+	if intent.TTL <= 0 {
+		fmt.Fprintln(writer, "Rollback patch: not applicable (ttl=0)")
+		return nil
+	}
+
+	rollbackBytes, err := json.MarshalIndent(rollbackPayload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format rollback patch: %w", err)
+	}
+	fmt.Fprintln(writer, "Rollback patch:")
+	fmt.Fprintln(writer, string(rollbackBytes))
 	return nil
 }
 

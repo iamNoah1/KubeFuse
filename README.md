@@ -7,7 +7,7 @@ A CLI tool for safe, temporary live-patching of Kubernetes resources. KubeFuse a
 - Patch Kubernetes resources with dot-paths, e.g. `spec.replicas=2`
 - TTL-based rollback (the CLI waits and reverts the change)
 - Audit annotations for reason and TTL
-- Dry-run mode for previewing changes
+- Dry-run mode for previewing apply/rollback patches
 - Resource-aware shell completion
 
 ## Install
@@ -61,7 +61,8 @@ kubefuse set deploy/api -n prod metadata.labels.tier=backend --ttl 30m --reason 
 
 1. KubeFuse reads the current values at each patch path (and the existing audit annotations).
 2. It applies your merge patch and adds `kubefuse.dev/reason` + `kubefuse.dev/ttl`.
-3. If `--ttl` is non-zero and not `--dry-run`, KubeFuse waits for the TTL and applies a rollback patch.
+3. If `--dry-run` is set, KubeFuse prints the apply/rollback patches and exits without changing the resource.
+4. If `--ttl` is non-zero and not `--dry-run`, KubeFuse waits for the TTL and applies a rollback patch.
 
 Note: The CLI process stays running until the rollback is complete.
 

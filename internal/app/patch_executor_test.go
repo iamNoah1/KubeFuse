@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -189,5 +190,62 @@ func TestExecutePatchIntentRollsBackAfterTTL(t *testing.T) {
 
 	if !found || ttl != "30s" {
 		t.Fatalf("expected ttl annotation to be restored, got %q (found=%t)", ttl, found)
+	}
+}
+
+func TestExecutePatchIntentDryRunDoesNotApplyPatch(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	gvrSingular := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"}
+
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
+	mapper.AddSpecific(gvk, gvr, gvrSingular, meta.RESTScopeNamespace)
+
+	deployment := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]any{
+				"name":      "web",
+				"namespace": "default",
+			},
+			"spec": map[string]any{
+				"replicas": int64(2),
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	client := fake.NewSimpleDynamicClient(scheme, deployment)
+	executor := NewPatchExecutorWithClients(client, mapper)
+	executor.output = io.Discard
+
+	intent := domain.NewPatchIntent(domain.ResourceRef{Kind: "deployments", Name: "web", Namespace: "default"},
+		[]domain.Patch{domain.NewPatch([]string{"spec", "replicas"}, domain.NewInt(5))},
+		domain.WithReason("scale up"),
+		domain.WithTTL(10*time.Second),
+		domain.WithDryRun(true),
+	)
+
+	if err := executor.ExecutePatchIntent(context.Background(), intent); err != nil {
+		t.Fatalf("ExecutePatchIntent returned error: %v", err)
+	}
+
+	updated, err := client.Resource(gvr).Namespace("default").Get(context.Background(), "web", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to fetch resource: %v", err)
+	}
+
+	replicas, found, err := unstructured.NestedInt64(updated.Object, "spec", "replicas")
+	if err != nil {
+		t.Fatalf("error reading replicas: %v", err)
+	}
+
+	if !found || replicas != 2 {
+		t.Fatalf("expected replicas to remain 2, got %d (found=%t)", replicas, found)
+	}
+
+	if _, found, _ := unstructured.NestedString(updated.Object, "metadata", "annotations", annotationReason); found {
+		t.Fatalf("expected reason annotation to remain unset on dry-run")
 	}
 }
