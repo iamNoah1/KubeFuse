@@ -32,6 +32,8 @@ You need access to a Kubernetes cluster and a working `kubectl` context (KubeFus
 
 kubefuse set <kind/name> <path=value>... [--ttl 10m] [--reason "..."] [--dry-run]
 
+KubeFuse currently exposes a single command: `set`.
+
 ### Shell completion
 Generate completion scripts:
 
@@ -103,6 +105,8 @@ Rollback patch:
 2. It applies your merge patch and adds `kubefuse.dev/reason` + `kubefuse.dev/ttl`.
 3. If `--dry-run` is set, KubeFuse prints the apply/rollback patches and exits without changing the resource.
 4. If `--ttl` is non-zero and not `--dry-run`, KubeFuse waits for the TTL and applies a rollback patch.
+
+When a TTL is set, the CLI prints a waiting line with a spinner, countdown, and scheduled rollback time.
 
 Note: The CLI process stays running until the rollback is complete.
 

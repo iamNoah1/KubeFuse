@@ -7,14 +7,14 @@ Thanks for your interest in KubeFuse.
 Build/run locally:
 
 ```sh
-go run main.go <command> <subcommand>
+go run main.go set <kind/name> <path=value>...
 ```
 
 Or build the binary:
 
 ```sh
 go build -o kubefuse
-./kubefuse <command> <subcommand>
+./kubefuse set <kind/name> <path=value>...
 ```
 
 ## Tests
@@ -93,6 +93,9 @@ kubectl get deployment web -w
 ## Releases
 
 Releases are built and published automatically from git tags (e.g., `v0.2.0`) using GitHub Actions + GoReleaser.
+
+GoReleaser uses the single config file at `.goreleaser.yaml`. The GitHub Actions workflow calls
+`goreleaser release --clean`, which reads that file and builds the cross-platform archives and checksums.
 
 Create a release:
 

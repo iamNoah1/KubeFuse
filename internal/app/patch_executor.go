@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/iamNoah1/KubeFuse/internal/domain"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -29,7 +30,10 @@ const (
 	annotationReason = "kubefuse.dev/reason"
 	annotationTTL    = "kubefuse.dev/ttl"
 	fieldManager     = "kubefuse"
+	spinnerInterval  = 120 * time.Millisecond
 )
+
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 type PatchExecutor struct {
 	dynamicClient dynamic.Interface
@@ -38,15 +42,19 @@ type PatchExecutor struct {
 	output        io.Writer
 }
 
-func NewPatchExecutor() (*PatchExecutor, error) {
+func (p *PatchExecutor) ensureClients() error {
+	if p.dynamicClient != nil && p.restMapper != nil {
+		return nil
+	}
+
 	cfg, err := buildKubeConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to load kubeconfig: %w", err)
+		return fmt.Errorf("unable to load kubeconfig: %w", err)
 	}
 
 	disco, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create discovery client: %w", err)
+		return fmt.Errorf("unable to create discovery client: %w", err)
 	}
 
 	mapper := restmapper.NewShortcutExpander(
@@ -57,23 +65,47 @@ func NewPatchExecutor() (*PatchExecutor, error) {
 
 	dynClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create dynamic client: %w", err)
+		return fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	return &PatchExecutor{dynamicClient: dynClient, restMapper: mapper, waitFunc: waitForTTL, output: os.Stdout}, nil
+	p.dynamicClient = dynClient
+	p.restMapper = mapper
+	return nil
+}
+
+func NewPatchExecutor() (*PatchExecutor, error) {
+	return &PatchExecutor{waitFunc: waitForTTL, output: os.Stdout}, nil
 }
 
 func NewPatchExecutorWithClients(dynamicClient dynamic.Interface, mapper meta.RESTMapper) *PatchExecutor {
 	return &PatchExecutor{dynamicClient: dynamicClient, restMapper: mapper, waitFunc: waitForTTL, output: os.Stdout}
 }
 
-func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.PatchIntent) error {
+func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.PatchIntent) (err error) {
 	if len(intent.Patches) == 0 {
 		return errors.New("no patches to apply")
 	}
 
-	if p.dynamicClient == nil || p.restMapper == nil {
-		return errors.New("executor is not configured with Kubernetes clients")
+	var stopSpinner func()
+	if intent.TTL > 0 && !intent.DryRun {
+		stopSpinner = p.startSpinner("Applying patch and scheduling rollback...")
+		defer func() {
+			if stopSpinner == nil {
+				return
+			}
+			stopSpinner()
+			if err != nil {
+				writer := p.output
+				if writer == nil {
+					writer = os.Stdout
+				}
+				fmt.Fprintln(writer)
+			}
+		}()
+	}
+
+	if err := p.ensureClients(); err != nil {
+		return err
 	}
 
 	payload, err := buildMergePatchPayload(intent)
@@ -139,7 +171,12 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 		return errors.New("no wait function configured for TTL rollback")
 	}
 
-	if err := p.waitFunc(ctx, intent.TTL); err != nil {
+	if stopSpinner != nil {
+		stopSpinner()
+		stopSpinner = nil
+	}
+
+	if err := p.waitForRollback(ctx, intent.TTL); err != nil {
 		return err
 	}
 
@@ -154,6 +191,92 @@ func (p *PatchExecutor) ExecutePatchIntent(ctx context.Context, intent domain.Pa
 	}
 
 	return nil
+}
+
+func (p *PatchExecutor) startSpinner(message string) func() {
+	writer := p.output
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	ticker := time.NewTicker(spinnerInterval)
+	step := 0
+
+	render := func() {
+		fmt.Fprintf(writer, "\r%s %s", spinnerFrames[step%len(spinnerFrames)], message)
+	}
+
+	render()
+	go func() {
+		defer close(stopped)
+		for {
+			select {
+			case <-ticker.C:
+				step++
+				render()
+			case <-done:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(done)
+		<-stopped
+	}
+}
+
+func (p *PatchExecutor) waitForRollback(ctx context.Context, ttl time.Duration) error {
+	writer := p.output
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	rollbackAt := time.Now().Add(ttl)
+	step := 0
+
+	render := func() {
+		remaining := time.Until(rollbackAt)
+		countdown := formatCountdown(remaining)
+		fmt.Fprintf(writer, "\r%s Waiting %s before rollback (at %s) - remaining %s", spinnerFrames[step%len(spinnerFrames)], ttl, rollbackAt.Format(time.RFC3339), countdown)
+	}
+
+	ticker := time.NewTicker(spinnerInterval)
+	defer ticker.Stop()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- p.waitFunc(ctx, ttl)
+	}()
+
+	render()
+	for {
+		select {
+		case err := <-done:
+			fmt.Fprintln(writer)
+			return err
+		case <-ticker.C:
+			step++
+			render()
+		}
+	}
+}
+
+func formatCountdown(d time.Duration) string {
+	seconds := int64(math.Ceil(d.Seconds()))
+	if seconds < 0 {
+		seconds = 0
+	}
+	hours := seconds / 3600
+	minutes := (seconds % 3600) / 60
+	remainingSeconds := seconds % 60
+	if hours > 0 {
+		return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, remainingSeconds)
+	}
+	return fmt.Sprintf("%02d:%02d", minutes, remainingSeconds)
 }
 
 func (p *PatchExecutor) printDryRunPreview(intent domain.PatchIntent, applyPayload map[string]any, rollbackPayload map[string]any) error {
@@ -196,6 +319,10 @@ func (p *PatchExecutor) printDryRunPreview(intent domain.PatchIntent, applyPaylo
 }
 
 func (p *PatchExecutor) resolveResource(kind string) (*meta.RESTMapping, error) {
+	if err := p.ensureClients(); err != nil {
+		return nil, err
+	}
+
 	gvr, err := p.restMapper.ResourceFor(schema.GroupVersionResource{Resource: strings.ToLower(kind)})
 	if err != nil {
 		return nil, fmt.Errorf("unable to resolve resource for kind %q: %w", kind, err)
@@ -215,6 +342,10 @@ func (p *PatchExecutor) resolveResource(kind string) (*meta.RESTMapping, error) 
 }
 
 func (p *PatchExecutor) resourceInterface(mapping *meta.RESTMapping, namespace string) (dynamic.ResourceInterface, error) {
+	if err := p.ensureClients(); err != nil {
+		return nil, err
+	}
+
 	if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 		ns := namespace
 		if ns == "" {
