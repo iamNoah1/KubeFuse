@@ -1,3 +1,5 @@
+![KubeFuse logo](docs/kubefuse-logo.png)
+
 # KubeFuse
 
 A CLI tool for safe, temporary live-patching of Kubernetes resources. KubeFuse applies a patch, waits for the TTL, and rolls the resource back to its original values.
