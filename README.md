@@ -2,17 +2,39 @@
 
 # KubeFuse
 
-A CLI tool for safe, temporary live-patching of Kubernetes resources. KubeFuse applies a patch, waits for the TTL, and rolls the resource back to its original values.
+**Safe, temporary live-patching for Kubernetes.**
 
-## Overview
-### Key Features (MVP)
-- Patch Kubernetes resources with dot-paths, e.g. `spec.replicas=2`
+KubeFuse is a CLI tool designed for *on-call and platform engineers* who need to apply **explicit, time-boxed hotfixes** to Kubernetes resources — without permanently drifting from GitOps or Helm.
+
+It applies a patch, annotates the intent, waits for a TTL, and automatically rolls the resource back to its original state.
+
+---
+
+## Why KubeFuse?
+
+Sometimes you need to fix production *now*.
+
+But:
+- `kubectl patch` is risky and hard to audit
+- GitOps changes can take too long
+- Temporary fixes often become permanent by accident
+
+KubeFuse is built for exactly these moments.
+
+---
+
+## Key Features (MVP)
+
+- Patch Kubernetes resources using dot-paths  
+  `spec.replicas=2`
 - TTL-based rollback (the CLI waits and reverts the change)
-- Audit annotations for reason and TTL
-- Dry-run mode for previewing apply/rollback patches
-- Resource-aware shell completion
+- Audit annotations (`reason`, `ttl`)
+- Dry-run mode to preview apply & rollback patches
+- Resource-aware shell completion (kinds & names)
 
-## Install
+---
+
+## Installation
 
 ### Go install (recommended for Go users)
 ```sh
@@ -26,17 +48,30 @@ tar -xzf kubefuse_v0.1.0_darwin_arm64.tar.gz
 ./kubefuse --help
 ```
 
+---
+
 ## Prerequisites
-You need access to a Kubernetes cluster and a working `kubectl` context (KubeFuse uses your `KUBECONFIG`).
+
+- Access to a Kubernetes cluster
+- A working `kubectl` context  
+  (KubeFuse uses your existing `KUBECONFIG`)
+
+---
 
 ## Quickstart
+
 ### Command syntax
 
-kubefuse set <kind/name> <path=value>... [--ttl 10m] [--reason "..."] [--dry-run]
+```text
+kubefuse set <kind/name> <path=value>... [flags]
+```
 
-KubeFuse currently exposes a single command: `set`.
+Currently, KubeFuse exposes a single command: **`set`**.
+
+---
 
 ### Shell completion
+
 Generate completion scripts:
 
 ```sh
@@ -48,23 +83,34 @@ kubefuse completion powershell
 
 The `set` command completes resource kinds and names using your current kubeconfig and `--namespace` flag.
 
-### Examples
-Example:
+---
+
+## Examples
+
+### Scale a deployment temporarily
 
 ```sh
-kubefuse set deployment/web spec.replicas=3 --ttl 5m --reason "scale for peak"
+kubefuse set deployment/web spec.replicas=3 \
+  --ttl 5m \
+  --reason "scale for peak"
 ```
 
-Example (namespace + labels):
+### Add a temporary label in production
 
 ```sh
-kubefuse set deploy/api -n prod metadata.labels.tier=backend --ttl 30m --reason "temporary label"
+kubefuse set deploy/api -n prod metadata.labels.tier=backend \
+  --ttl 30m \
+  --reason "temporary label"
 ```
 
-Example (dry-run preview):
+### Preview without applying (dry-run)
 
 ```sh
-kubefuse set deployment/web spec.replicas=3 -n default --ttl 5m --reason "scale for peak" --dry-run
+kubefuse set deployment/web spec.replicas=3 \
+  -n default \
+  --ttl 5m \
+  --reason "scale for peak" \
+  --dry-run
 ```
 
 Example output (values depend on the current resource):
@@ -75,6 +121,7 @@ Target: deployment/web
 Namespace: default
 Reason: scale for peak
 TTL: 5m0s
+
 Apply patch:
 {
   "metadata": {
@@ -87,6 +134,7 @@ Apply patch:
     "replicas": 3
   }
 }
+
 Rollback patch:
 {
   "metadata": {
@@ -101,16 +149,41 @@ Rollback patch:
 }
 ```
 
+---
+
 ## How It Works
 
-1. KubeFuse reads the current values at each patch path (and the existing audit annotations).
-2. It applies your merge patch and adds `kubefuse.dev/reason` + `kubefuse.dev/ttl`.
-3. If `--dry-run` is set, KubeFuse prints the apply/rollback patches and exits without changing the resource.
-4. If `--ttl` is non-zero and not `--dry-run`, KubeFuse waits for the TTL and applies a rollback patch.
+1. KubeFuse reads the current values at each patch path (and existing audit annotations).
+2. It applies your merge patch and adds:
+   - `kubefuse.dev/reason`
+   - `kubefuse.dev/ttl`
+3. If `--dry-run` is set, KubeFuse prints the apply & rollback patches and exits.
+4. If a TTL is provided (and not dry-run), the CLI waits and automatically applies a rollback patch.
 
-When a TTL is set, the CLI prints a waiting line with a spinner, countdown, and scheduled rollback time.
+While waiting, the CLI displays:
+- a spinner
+- a countdown
+- the scheduled rollback time
 
-Note: The CLI process stays running until the rollback is complete.
+> Note: the CLI process stays running until the rollback is complete.
+
+---
+
+## Project Status
+
+⚠️ **Early-stage project (MVP)**  
+The interface and behavior may still evolve.
+
+Feedback, issues, and ideas are very welcome.
+
+---
 
 ## Contributing
+
 See `CONTRIBUTING.md`.
+
+---
+
+## License
+
+MIT
